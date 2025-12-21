@@ -26,28 +26,19 @@ public class MainActivity extends Activity {
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // 在 super.onCreate 之前設定視窗屬性，避免閃爍
-        getWindow().setFlags(
-            WindowManager.LayoutParams.FLAG_FULLSCREEN,
-            WindowManager.LayoutParams.FLAG_FULLSCREEN
-        );
+        // 設定視窗屬性
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-        getWindow().setStatusBarColor(0xFF253644);
+        getWindow().setStatusBarColor(0xFF1D2833);
         getWindow().setNavigationBarColor(0xFF253644);
         
         super.onCreate(savedInstanceState);
         
         setContentView(R.layout.activity_main);
         
-        // 全螢幕沉浸式模式
+        // 保持佈局穩定
         getWindow().getDecorView().setSystemUiVisibility(
-            View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
-            View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
-            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
-            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
-            View.SYSTEM_UI_FLAG_FULLSCREEN |
-            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE
         );
         
         webView = findViewById(R.id.webView);
@@ -149,8 +140,8 @@ public class MainActivity extends Activity {
                 
                 setRequestedOrientation(originalOrientation);
                 
-                // 恢復系統 UI
-                getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
+                // 恢復系統 UI（顯示狀態列和導航列）
+                getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
             }
             
             @Override
