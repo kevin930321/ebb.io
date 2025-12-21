@@ -8,14 +8,22 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.ProgressBar;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+
 /**
- * 簡單的 WebViewClient
+ * EbbWebViewClient - 支援自動重載腳本注入
  */
 public class EbbWebViewClient extends WebViewClient {
     
+    private final Context context;
     private final ProgressBar progressBar;
+    private String cachedScript = null;
     
     public EbbWebViewClient(Context context, ProgressBar progressBar) {
+        this.context = context;
         this.progressBar = progressBar;
     }
     
@@ -33,11 +41,50 @@ public class EbbWebViewClient extends WebViewClient {
         if (progressBar != null) {
             progressBar.setVisibility(View.GONE);
         }
+        
+        // 只在 ebb.io 網頁注入腳本
+        if (url != null && url.contains("ebb.io")) {
+            injectScript(view);
+        }
     }
     
     @Override
     public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
         // 讓 WebView 處理所有 URL
         return false;
+    }
+    
+    /**
+     * 從 assets 載入並注入自動重載腳本
+     */
+    private void injectScript(WebView view) {
+        if (cachedScript == null) {
+            cachedScript = loadScriptFromAssets("ebb_auto_reload.js");
+        }
+        
+        if (cachedScript != null && !cachedScript.isEmpty()) {
+            view.evaluateJavascript(cachedScript, null);
+        }
+    }
+    
+    /**
+     * 從 assets 目錄讀取 JavaScript 檔案
+     */
+    private String loadScriptFromAssets(String filename) {
+        StringBuilder script = new StringBuilder();
+        try {
+            InputStream inputStream = context.getAssets().open(filename);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                script.append(line).append("\n");
+            }
+            reader.close();
+            inputStream.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+        return script.toString();
     }
 }
