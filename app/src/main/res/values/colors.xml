@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 主要顏色（配合 ebb.io 深色主題） -->
+    <color name="primary">#253644</color>
+    <color name="primary_dark">#1a2830</color>
+    <color name="accent">#253644</color>
+    
+    <!-- 背景顏色 -->
+    <color name="background_dark">#253644</color>
+    <color name="background_surface">#1a2830</color>
+    
+    <!-- 文字顏色 -->
+    <color name="text_primary">#ffffff</color>
+    <color name="text_secondary">#b0b0b0</color>
+    
+    <!-- 狀態顏色 -->
+    <color name="success">#00cec9</color>
+    <color name="error">#ff7675</color>
+</resources>

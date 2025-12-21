@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="accent">#253644</color>
+    <color name="background_dark">#253644</color>
+    <color name="background_surface">#1a2830</color>
+    <color name="error">#ff7675</color>
+    <color name="primary">#253644</color>
+    <color name="primary_dark">#1a2830</color>
+    <color name="success">#00cec9</color>
+    <color name="text_primary">#ffffff</color>
+    <color name="text_secondary">#b0b0b0</color>
+    <string name="app_name">ebb.io</string>
+    <style name="Theme.EbbWebView" parent="android:Theme.Material.NoActionBar">
+        
+        <item name="android:colorPrimary">@color/primary</item>
+        <item name="android:colorPrimaryDark">@color/primary_dark</item>
+        <item name="android:colorAccent">@color/accent</item>
+        
+        
+        <item name="android:windowBackground">@color/background_dark</item>
+        <item name="android:colorBackground">@color/background_dark</item>
+        
+        
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+</resources>
