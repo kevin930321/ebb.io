@@ -26,7 +26,19 @@ public class MainActivity extends Activity {
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // 在 super.onCreate 之前設定視窗屬性，避免閃爍
+        getWindow().setFlags(
+            WindowManager.LayoutParams.FLAG_FULLSCREEN,
+            WindowManager.LayoutParams.FLAG_FULLSCREEN
+        );
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        getWindow().setStatusBarColor(0xFF253644);
+        getWindow().setNavigationBarColor(0xFF253644);
+        
         super.onCreate(savedInstanceState);
+        
+        setContentView(R.layout.activity_main);
         
         // 全螢幕沉浸式模式
         getWindow().getDecorView().setSystemUiVisibility(
@@ -38,13 +50,11 @@ public class MainActivity extends Activity {
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         );
         
-        setContentView(R.layout.activity_main);
-        
-        // 保持螢幕常亮
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        
         webView = findViewById(R.id.webView);
         fullscreenContainer = findViewById(R.id.fullscreen_container);
+        
+        // 設定 WebView 背景色，避免載入時顯示白色
+        webView.setBackgroundColor(0xFF253644);
         
         setupWebView();
         webView.loadUrl(TARGET_URL);
