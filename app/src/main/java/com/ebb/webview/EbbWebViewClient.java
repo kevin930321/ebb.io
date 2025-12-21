@@ -59,16 +59,7 @@ public class EbbWebViewClient extends WebViewClient {
      */
     private void injectScript(WebView view) {
         if (cachedScript == null) {
-            // Load both scripts
-            StringBuilder combinedScript = new StringBuilder();
-            
-            String autoReload = loadScriptFromAssets("ebb_auto_reload.js");
-            if (autoReload != null) combinedScript.append(autoReload).append("\n");
-            
-            String mobileUi = loadScriptFromAssets("ebb_mobile_ui.js");
-            if (mobileUi != null) combinedScript.append(mobileUi).append("\n");
-            
-            cachedScript = combinedScript.toString();
+            cachedScript = loadScriptFromAssets("ebb_auto_reload.js");
         }
         
         if (cachedScript != null && !cachedScript.isEmpty()) {
