@@ -20,8 +20,7 @@ public class EbbWebViewClient extends WebViewClient {
     
     private final Context context;
     private final ProgressBar progressBar;
-    private String cachedAutoReloadScript = null;
-    private String cachedMobileUIScript = null;
+    private String cachedScript = null;
     
     public EbbWebViewClient(Context context, ProgressBar progressBar) {
         this.context = context;
@@ -56,23 +55,15 @@ public class EbbWebViewClient extends WebViewClient {
     }
     
     /**
-     * 從 assets 載入並注入自動重載腳本和 Mobile UI 腳本
+     * 從 assets 載入並注入自動重載腳本
      */
     private void injectScript(WebView view) {
-        // 載入並注入自動重載腳本
-        if (cachedAutoReloadScript == null) {
-            cachedAutoReloadScript = loadScriptFromAssets("ebb_auto_reload.js");
-        }
-        if (cachedAutoReloadScript != null && !cachedAutoReloadScript.isEmpty()) {
-            view.evaluateJavascript(cachedAutoReloadScript, null);
+        if (cachedScript == null) {
+            cachedScript = loadScriptFromAssets("ebb_auto_reload.js");
         }
         
-        // 載入並注入 Mobile UI 腳本
-        if (cachedMobileUIScript == null) {
-            cachedMobileUIScript = loadScriptFromAssets("ebb_mobile_ui.js");
-        }
-        if (cachedMobileUIScript != null && !cachedMobileUIScript.isEmpty()) {
-            view.evaluateJavascript(cachedMobileUIScript, null);
+        if (cachedScript != null && !cachedScript.isEmpty()) {
+            view.evaluateJavascript(cachedScript, null);
         }
     }
     
