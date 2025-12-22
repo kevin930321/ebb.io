@@ -45,8 +45,14 @@
 
         add_button_for_each_episode();
 
+        // 檢查是否為人流管制錯誤
+        const errorEl = document.querySelector(".error-message");
+        const isRateLimit = errorEl && errorEl.innerText.includes("人流管制");
+
         const flag = get_flag();
-        if (!flag) {
+
+        // 如果沒有開啟重試標記且不是人流管制，則僅觀察不執行後續
+        if (!flag && !isRateLimit) {
             observer.observe(document.body, config);
             return;
         }
@@ -54,9 +60,10 @@
         const isError = $(".error-message").length !== 0;
         if (isError) {
             console.log("Detect loading error, try reloading");
-            const errorText = document.querySelector(".error-message").innerText;
-            if (errorText.includes("人流管制")) {
-                console.log("Detect rate limit, try reloading");
+            if (isRateLimit) {
+                console.log("Detect rate limit, auto-starting retry sequence");
+                // 設為 true 以便後續持續追蹤（雖然後續檢查也會看 isRateLimit，但設個 flag 較保險）
+                set_flag(true);
             }
             fail_handle();
             observer.observe(document.body, config);
