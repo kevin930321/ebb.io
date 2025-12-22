@@ -6,8 +6,6 @@
     'use strict';
 
     const flag_name = "reload";
-    const current_season_key = "current_seasonId";
-    const current_episode_key = "current_episode";
 
     function set_flag(val) {
         sessionStorage.setItem(flag_name, val);
@@ -15,18 +13,6 @@
 
     function get_flag() {
         return sessionStorage.getItem(flag_name) === "true";
-    }
-
-    function set_current_video(seasonId, episode) {
-        sessionStorage.setItem(current_season_key, seasonId);
-        sessionStorage.setItem(current_episode_key, episode);
-    }
-
-    function get_current_video() {
-        return {
-            seasonId: sessionStorage.getItem(current_season_key),
-            episode: sessionStorage.getItem(current_episode_key)
-        };
     }
 
     const config = {
@@ -107,10 +93,8 @@
                 console.log("Start reloading");
                 event.preventDefault();
                 set_flag(true);
-                set_current_video(seasonId, episode);
                 updateWatchHistory(seasonId, episode);
-                // 模擬點擊原本的試看按鈕
-                retry_video();
+                location.reload();
             });
 
             clone.setAttribute("href", "javascript:void(0)");
@@ -128,7 +112,7 @@
         }
         console.log("check");
 
-        const delay = 5;
+        const delay = 0;
         const delay_ms = delay * 1000;
         console.log("Set timer " + delay + "s");
 
@@ -146,9 +130,9 @@
 
         const timeoutIds = [];
 
-        // retry timeout - 使用 retry_video 而不是 location.reload
+        // reload timeout
         timeoutIds.push(setTimeout(function () {
-            retry_video();
+            trigger_player_retry();
         }, delay_ms));
 
         // countdown
@@ -173,40 +157,18 @@
         }
     }
 
-    // 模擬點擊試看按鈕來重試影片
-    function retry_video() {
-        const video = get_current_video();
-        if (!video.seasonId || !video.episode) {
-            console.log("No video info found, fallback to reload");
-            location.reload();
-            return;
-        }
+    function trigger_player_retry() {
+        console.log("Attempting to retry video via Vue component...");
+        const playerEl = Array.from(document.querySelectorAll('*')).find(e => e.__vue__ && e.__vue__.$options.name === 'player-x');
 
-        console.log("Retrying video:", video.seasonId, video.episode);
-
-        // 先更新觀看記錄（這會強制服務器重新提供影片）
-        updateWatchHistory(video.seasonId, video.episode);
-
-        // 找到並點擊對應的試看按鈕
-        const episodeLinks = document.querySelectorAll('div.actions a[href*="watch"]');
-        let targetButton = null;
-
-        episodeLinks.forEach(function (link) {
-            const href = link.getAttribute('href');
-            if (href && href.includes('seasonId=' + video.seasonId) && href.includes('episode=' + video.episode)) {
-                targetButton = link;
-            }
-        });
-
-        if (targetButton) {
-            console.log("Found and clicking the watch button");
-            // 直接觸發原本的點擊，這會導航到播放頁面
-            targetButton.click();
+        if (playerEl && playerEl.__vue__) {
+            console.log("Player component found, triggering reload.");
+            const vm = playerEl.__vue__;
+            // The method found to reload the video data
+            vm.onVdataChanged(vm.vdata);
         } else {
-            // 如果找不到按鈕，嘗試直接導航到播放頁面
-            console.log("Button not found, navigating directly");
-            const watchUrl = '/watch?seasonId=' + video.seasonId + '&episode=' + video.episode + '&t=' + Date.now();
-            window.location.href = watchUrl;
+            console.warn("Player component not found, falling back to location.reload()");
+            location.reload();
         }
     }
 
