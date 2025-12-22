@@ -54,6 +54,10 @@
         const isError = $(".error-message").length !== 0;
         if (isError) {
             console.log("Detect loading error, try reloading");
+            const errorText = document.querySelector(".error-message").innerText;
+            if (errorText.includes("人流管制")) {
+                console.log("Detect rate limit, try reloading");
+            }
             fail_handle();
             observer.observe(document.body, config);
             return;
@@ -94,7 +98,7 @@
                 event.preventDefault();
                 set_flag(true);
                 updateWatchHistory(seasonId, episode);
-                location.reload();
+                trigger_player_retry();
             });
 
             clone.setAttribute("href", "javascript:void(0)");
