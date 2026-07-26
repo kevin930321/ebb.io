@@ -3,6 +3,7 @@ package com.ebb.webview;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.pm.ActivityInfo;
+import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.view.View;
@@ -11,6 +12,7 @@ import android.webkit.CookieManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
 public class MainActivity extends Activity {
@@ -22,6 +24,8 @@ public class MainActivity extends Activity {
     private View customView;
     private WebChromeClient.CustomViewCallback customViewCallback;
     private int originalOrientation;
+    private WebChromeClient webChromeClient;
+    private WebViewClient webViewClient;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -78,6 +82,11 @@ public class MainActivity extends Activity {
         // 媒體播放設定
         settings.setMediaPlaybackRequiresUserGesture(false);
         
+        // 影片播放相關設定
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(true);
+        settings.setMediaPlaybackRequiresUserGesture(false);
+        
         // Mixed content 支援
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         
@@ -92,10 +101,11 @@ public class MainActivity extends Activity {
         cookieManager.setAcceptThirdPartyCookies(webView, true);
         
         // 設定簡單的 WebViewClient
-        webView.setWebViewClient(new EbbWebViewClient(this, null));
+        webViewClient = new EbbWebViewClient(this, null);
+        webView.setWebViewClient(webViewClient);
         
         // 設定 WebChromeClient（支援全螢幕影片）
-        webView.setWebChromeClient(new WebChromeClient() {
+        webChromeClient = new WebChromeClient() {
             
             @Override
             public void onShowCustomView(View view, CustomViewCallback callback) {
@@ -110,7 +120,8 @@ public class MainActivity extends Activity {
                 
                 fullscreenContainer.addView(customView);
                 fullscreenContainer.setVisibility(View.VISIBLE);
-                webView.setVisibility(View.GONE);
+                // 不要隱藏 WebView，只讓它在後面，避免影片暫停
+                // webView.setVisibility(View.GONE);
                 
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
                 
@@ -133,7 +144,7 @@ public class MainActivity extends Activity {
                 
                 fullscreenContainer.removeView(customView);
                 fullscreenContainer.setVisibility(View.GONE);
-                webView.setVisibility(View.VISIBLE);
+                // webView.setVisibility(View.VISIBLE);
                 
                 customView = null;
                 if (customViewCallback != null) {
@@ -151,17 +162,15 @@ public class MainActivity extends Activity {
             public Bitmap getDefaultVideoPoster() {
                 return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888);
             }
-        });
+        };
+        webView.setWebChromeClient(webChromeClient);
     }
     
     @Override
     public void onBackPressed() {
         // 如果在全螢幕模式，先退出全螢幕
-        if (customView != null) {
-            webView.getWebChromeClient();
-            if (customViewCallback != null) {
-                customViewCallback.onCustomViewHidden();
-            }
+        if (customView != null && webChromeClient != null) {
+            webChromeClient.onHideCustomView();
             return;
         }
         
@@ -171,6 +180,27 @@ public class MainActivity extends Activity {
         } else {
             super.onBackPressed();
         }
+    }
+    
+    @Override
+    public void onConfigurationChanged(android.content.res.Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // 當配置改變時（如螢幕旋轉），WebView 會自動處理佈局變更
+        // 這裡不需要額外處理，因為我們在 Manifest 中設定了 configChanges
+    }
+    
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        // 保存 WebView 狀態（包含影片播放位置、網頁滾動位置等）
+        webView.saveState(outState);
+    }
+    
+    @Override
+    protected void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        // 恢復 WebView 狀態
+        webView.restoreState(savedInstanceState);
     }
     
     @Override
