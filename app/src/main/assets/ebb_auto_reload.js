@@ -5,7 +5,19 @@
 (function () {
     'use strict';
 
+    // 同一份文件只初始化一次，避免重複注入時疊加多個 observer
+    if (window.__ebbAutoReload) {
+        return;
+    }
+    window.__ebbAutoReload = true;
+
     const flag_name = "reload";
+
+    // 偵測到錯誤後多久重試（毫秒）
+    const RETRY_DELAY_MS = 0;
+
+    // DOM 變動時最多每隔多久處理一次（毫秒），避免播放器 UI 一直變動時頻繁執行
+    const THROTTLE_MS = 100;
 
     function set_flag(val) {
         sessionStorage.setItem(flag_name, val);
@@ -22,43 +34,20 @@
         subtree: true,
     };
 
-    // 簡易 jQuery 替代函數
-    function $(selector) {
-        const elements = document.querySelectorAll(selector);
-        return {
-            length: elements.length,
-            first: function () {
-                return elements[0];
-            },
-            each: function (callback) {
-                elements.forEach((el, index) => callback(index, el));
-            },
-            attr: function (name) {
-                return elements[0] ? elements[0].getAttribute(name) : null;
-            }
-        };
-    }
-
     // 頁面修改函數
-    function page_modify(list, observer) {
-        observer.disconnect();
-
+    function page_modify() {
         add_button_for_each_episode();
 
         // 檢查是否為人流管制錯誤
         const errorEl = document.querySelector(".error-message");
-        const isRateLimit = errorEl && errorEl.innerText.includes("人流管制");
+        const isRateLimit = errorEl !== null && errorEl.innerText.includes("人流管制");
 
-        const flag = get_flag();
-
-        // 如果沒有開啟重試標記且不是人流管制，則僅觀察不執行後續
-        if (!flag && !isRateLimit) {
-            observer.observe(document.body, config);
+        // 如果沒有開啟重試標記且不是人流管制，則不執行後續
+        if (!get_flag() && !isRateLimit) {
             return;
         }
 
-        const isError = $(".error-message").length !== 0;
-        if (isError) {
+        if (errorEl) {
             console.log("Detect loading error, try reloading");
             if (isRateLimit) {
                 console.log("Detect rate limit, auto-starting retry sequence");
@@ -66,18 +55,14 @@
                 set_flag(true);
             }
             fail_handle();
-            observer.observe(document.body, config);
             return;
         }
 
-        const videoEl = $("video").first();
-        const isLoaded = videoEl && videoEl.getAttribute("src");
-        if (isLoaded) {
+        const videoEl = document.querySelector("video");
+        if (videoEl && videoEl.getAttribute("src")) {
             console.log("Video ready, Stop reloading");
             set_flag(false);
         }
-
-        observer.observe(document.body, config);
     }
 
     function add_button_for_each_episode() {
@@ -104,8 +89,8 @@
                 console.log("Start reloading");
                 event.preventDefault();
                 set_flag(true);
-                updateWatchHistory(seasonId, episode);
-                trigger_player_retry();
+                // 先更新觀看紀錄再重試（非同步，不會卡住畫面）
+                updateWatchHistory(seasonId, episode).then(trigger_player_retry);
             });
 
             clone.setAttribute("href", "javascript:void(0)");
@@ -118,54 +103,27 @@
 
     function fail_handle() {
         // check for a div - if exist, fail_handle had run already
-        if (document.querySelectorAll(".error-message div div").length !== 0) {
+        if (document.querySelector(".error-message div div")) {
             return;
         }
-        console.log("check");
 
-        const delay = 0;
-        const delay_ms = delay * 1000;
-        console.log("Set timer " + delay + "s");
-
-        // add reload countdown and cancel button to error message
+        // add retry message and cancel button to error message
         const message = document.createElement("div");
-        message.innerHTML = '<br><a id="counter">' + delay + '</a><a> 秒後重試... </a><a href="javascript:void(0)" id="cancelBtn">取消</a>';
+        message.innerHTML = '<br><a>重試中... </a><a href="javascript:void(0)">取消</a>';
 
         const errorDiv = document.querySelector(".error-message div");
         if (errorDiv) {
             errorDiv.appendChild(message);
         }
 
-        const counter = document.getElementById("counter");
-        const cancel = document.getElementById("cancelBtn");
+        const timeoutId = setTimeout(trigger_player_retry, RETRY_DELAY_MS);
 
-        const timeoutIds = [];
-
-        // reload timeout
-        timeoutIds.push(setTimeout(function () {
-            trigger_player_retry();
-        }, delay_ms));
-
-        // countdown
-        for (let i = 1; i <= delay; i++) {
-            const idx = setTimeout(function () {
-                if (counter) {
-                    counter.textContent = parseInt(counter.textContent) - 1;
-                }
-            }, 1000 * i);
-            timeoutIds.push(idx);
-        }
-
-        if (cancel) {
-            cancel.addEventListener("click", function (event) {
-                console.log("Stop reloading");
-                set_flag(false);
-                for (const idx of timeoutIds) {
-                    clearTimeout(idx);
-                }
-                message.remove();
-            });
-        }
+        message.lastElementChild.addEventListener("click", function () {
+            console.log("Stop reloading");
+            set_flag(false);
+            clearTimeout(timeoutId);
+            message.remove();
+        });
     }
 
     function trigger_player_retry() {
@@ -194,20 +152,67 @@
         data.set("time", 0);
         console.log("Updating watch history:", seasonId, episode);
 
-        const xhttp = new XMLHttpRequest();
-        xhttp.open("POST", api_url, false);
-        xhttp.send(data);
+        // 失敗也照樣繼續重試
+        return fetch(api_url, { method: "POST", body: data }).catch(function (err) {
+            console.warn("Failed to update watch history:", err);
+        });
     }
 
-    // Entry point
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function () {
-            const observer = new MutationObserver(page_modify);
-            observer.observe(document.body, config);
+    // 影片播放中才保持螢幕常亮（由 MainActivity 提供的 EbbAndroid 介面處理）
+    function set_keep_screen_on(keepOn) {
+        if (window.EbbAndroid) {
+            window.EbbAndroid.setKeepScreenOn(keepOn);
+        }
+    }
+
+    function update_keep_screen_on() {
+        const playing = Array.prototype.some.call(document.querySelectorAll("video"), function (v) {
+            return !v.paused && !v.ended;
         });
-    } else {
-        const observer = new MutationObserver(page_modify);
+        set_keep_screen_on(playing);
+    }
+
+    // 媒體事件不會冒泡，要在捕獲階段監聽
+    ["play", "playing", "pause", "ended", "emptied"].forEach(function (type) {
+        document.addEventListener(type, update_keep_screen_on, true);
+    });
+    window.addEventListener("pagehide", function () {
+        set_keep_screen_on(false);
+    });
+
+    // Entry point
+    let observer = null;
+    let pendingTimer = null;
+
+    function run_page_modify() {
+        pendingTimer = null;
+        // 處理期間暫停觀察，避免自己修改 DOM 又觸發 observer
+        observer.disconnect();
+        try {
+            page_modify();
+        } finally {
+            observer.observe(document.body, config);
+        }
+    }
+
+    // 節流：短時間內的多次 DOM 變動合併成一次處理
+    function schedule_page_modify() {
+        if (pendingTimer === null) {
+            pendingTimer = setTimeout(run_page_modify, THROTTLE_MS);
+        }
+    }
+
+    function start() {
+        observer = new MutationObserver(schedule_page_modify);
         observer.observe(document.body, config);
+        schedule_page_modify();
+        update_keep_screen_on();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start);
+    } else {
+        start();
     }
 
     console.log("ebb.io auto-reload script loaded");
