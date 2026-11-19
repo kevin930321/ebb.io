@@ -1,90 +1,98 @@
 package com.ebb.webview;
 
 import android.content.Context;
-import android.graphics.Bitmap;
-import android.view.View;
+import android.net.Uri;
+import android.util.Log;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.ProgressBar;
+
+import androidx.webkit.WebViewCompat;
+import androidx.webkit.WebViewFeature;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
- * EbbWebViewClient - 支援自動重載腳本注入
+ * EbbWebViewClient - 負責注入自動重載腳本
+ *
+ * 系統 WebView 支援時，用 addDocumentStartJavaScript 在每份 ebb.io 文件開始載入時注入一次；
+ * 不支援時退回 onPageFinished 注入（腳本本身有防重複初始化的保護）。
  */
 public class EbbWebViewClient extends WebViewClient {
-    
-    private final Context context;
-    private final ProgressBar progressBar;
-    private String cachedScript = null;
-    
-    public EbbWebViewClient(Context context, ProgressBar progressBar) {
-        this.context = context;
-        this.progressBar = progressBar;
-    }
-    
-    @Override
-    public void onPageStarted(WebView view, String url, Bitmap favicon) {
-        super.onPageStarted(view, url, favicon);
-        if (progressBar != null) {
-            progressBar.setVisibility(View.VISIBLE);
+
+    private static final String TAG = "EbbWebViewClient";
+    private static final String SCRIPT_ASSET = "ebb_auto_reload.js";
+    private static final String EBB_HOST = "ebb.io";
+    private static final Set<String> ALLOWED_ORIGINS = new HashSet<>(Arrays.asList(
+            "https://" + EBB_HOST,
+            "https://*." + EBB_HOST
+    ));
+
+    private final String script;
+    private final boolean injectOnPageFinished;
+
+    /**
+     * 必須在 webView.loadUrl() 之前建立，document-start 腳本才會套用到第一個頁面。
+     */
+    public EbbWebViewClient(WebView webView) {
+        script = loadScriptFromAssets(webView.getContext(), SCRIPT_ASSET);
+
+        boolean documentStart = false;
+        if (script != null && WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            WebViewCompat.addDocumentStartJavaScript(webView, script, ALLOWED_ORIGINS);
+            documentStart = true;
         }
+        injectOnPageFinished = script != null && !documentStart;
     }
-    
+
     @Override
     public void onPageFinished(WebView view, String url) {
         super.onPageFinished(view, url);
-        if (progressBar != null) {
-            progressBar.setVisibility(View.GONE);
-        }
-        
-        // 只在 ebb.io 網頁注入腳本
-        if (url != null && url.contains("ebb.io")) {
-            injectScript(view);
+
+        // 退回方案：只在 ebb.io 網頁注入腳本
+        if (injectOnPageFinished && isEbbUrl(url)) {
+            view.evaluateJavascript(script, null);
         }
     }
-    
+
     @Override
     public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
         // 讓 WebView 處理所有 URL
         return false;
     }
-    
+
     /**
-     * 從 assets 載入並注入自動重載腳本
+     * 比對網址的 host，避免像 Google 登入頁這種網址參數裡含有 "ebb.io" 的頁面被誤判
      */
-    private void injectScript(WebView view) {
-        if (cachedScript == null) {
-            cachedScript = loadScriptFromAssets("ebb_auto_reload.js");
+    private static boolean isEbbUrl(String url) {
+        if (url == null) {
+            return false;
         }
-        
-        if (cachedScript != null && !cachedScript.isEmpty()) {
-            view.evaluateJavascript(cachedScript, null);
-        }
+        String host = Uri.parse(url).getHost();
+        return host != null && (host.equals(EBB_HOST) || host.endsWith("." + EBB_HOST));
     }
-    
+
     /**
      * 從 assets 目錄讀取 JavaScript 檔案
      */
-    private String loadScriptFromAssets(String filename) {
-        StringBuilder script = new StringBuilder();
-        try {
-            InputStream inputStream = context.getAssets().open(filename);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+    private static String loadScriptFromAssets(Context context, String filename) {
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                context.getAssets().open(filename), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                script.append(line).append("\n");
+                sb.append(line).append('\n');
             }
-            reader.close();
-            inputStream.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.e(TAG, "Failed to load " + filename, e);
             return null;
         }
-        return script.toString();
+        return sb.toString();
     }
 }
